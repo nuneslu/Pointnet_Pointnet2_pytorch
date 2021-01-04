@@ -4,8 +4,6 @@ import torchvision
 import torchvision.datasets as datasets
 #from data_loader import *
 from PIL import Image
-import sys
-sys.path.append('..')
 from losses.contrastive import ContrastiveLoss
 from data_utils.ModelNetContrastiveDataLoader import ModelNetContrastiveDataLoader
 from math import ceil, floor
