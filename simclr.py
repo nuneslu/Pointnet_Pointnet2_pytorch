@@ -135,9 +135,9 @@ if __name__ == "__main__":
                         help='Name of dataset (default: CIFAR10')
     parser.add_argument('--data-dir', type=str, default='data',
                         help='Path to dataset (default: data')
-    parser.add_argument('--batch-size', type=int, default=2, metavar='N',
+    parser.add_argument('--batch-size', type=int, default=24, metavar='N',
                         help='input training batch-size')
-    parser.add_argument('--epochs', type=int, default=150, metavar='N',
+    parser.add_argument('--epochs', type=int, default=200, metavar='N',
                         help='number of training epochs (default: 150)')
     parser.add_argument('--lr', type=float, default=1e-3,
                         help='learning rate (default: 1e-3')
@@ -151,7 +151,7 @@ if __name__ == "__main__":
                         help='logging directory (default: checkpoint)')
     parser.add_argument('--checkpoint', type=str, default='bestcheckpoint.pt',
                         help='model checkpoint (default: bestcheckpoint.pt)')
-    parser.add_argument('--use-cuda', action='store_true', default=False,
+    parser.add_argument('--use-cuda', action='store_true', default=True,
                         help='using cuda (default: True')
     parser.add_argument('--load-model', type=str, default=None,
                         help='Load model to resume training for (default None)')
