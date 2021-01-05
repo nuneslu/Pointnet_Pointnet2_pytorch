@@ -22,7 +22,7 @@ class get_model(nn.Module):
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.4),
-            nn.Linear(feature_size)
+            nn.Linear(256, feature_size)
         )
 
     def forward(self, xyz):
