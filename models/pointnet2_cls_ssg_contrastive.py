@@ -41,14 +41,14 @@ class get_model(nn.Module):
 
 class ClassifierHead(torch.nn.Module):
     def __init__(self, args, input_dim=2048, num_classes=40):
-        torch.nn.Module.__init__(self)
+        nn.Module.__init__(self)
 
         projection_hidden = int(input_dim / 2)
-        self.classifier_head = torch.nn.Sequential(
-            torch.nn.Linear(input_dim, projection_hidden),
-            torch.nn.BatchNorm1d(projection_hidden),
-            torch.nn.ReLU(),
-            torch.nn.Linear(projection_hidden, num_classes),
+        self.classifier_head = nn.Sequential(
+            nn.Linear(input_dim, projection_hidden),
+            nn.BatchNorm1d(projection_hidden),
+            nn.ReLU(),
+            nn.Linear(projection_hidden, num_classes),
         )
 
     def forward(self, x):
