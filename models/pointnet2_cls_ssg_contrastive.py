@@ -41,11 +41,11 @@ class get_model(nn.Module):
 
         return h, z
 
-class ClassifierHead(torch.nn.Module):
+class ClassifierHead(nn.Module):
     def __init__(self, args, input_dim=1024, num_classes=40):
-        torch.nn.Module.__init__(self)
+        nn.Module.__init__(self)
 
-        self.fc = torch.nn.Linear(input_dim, num_classes)
+        self.fc = nn.Linear(input_dim, num_classes)
         self.fc = self.fc.cuda() if args.use_cuda else self.fc
 
     def forward(self, x):
