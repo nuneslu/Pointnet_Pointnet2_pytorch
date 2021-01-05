@@ -20,7 +20,7 @@ def train_validate(simclr, classifier, optimizer, data, args, is_train):
     else:
         classifier.eval()
 
-    loss_func = torch.nn.CrossEntropyLoss()
+    loss_func = torch.nn.NLLLoss()
     initial_loss = None
     total_loss = 0.0
     total_acc = 0.0
@@ -58,6 +58,7 @@ def train_validate(simclr, classifier, optimizer, data, args, is_train):
 
             # accumulate accuracy
             pred = z.max(dim=1)[1]
+            print(pred)
             correct = pred.eq(y).sum().item()
             correct /= y.size(0)
             batch_acc = (correct * 100)
