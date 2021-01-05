@@ -46,7 +46,7 @@ def train_validate(simclr, classifier, optimizer, data, args, is_train):
             z = classifier(h)
 
             # compute contrastive loss
-            loss = loss_func(z, y)
+            loss = loss_func(z, y.long())
 
             # if is_train backpropagate
             if is_train:
