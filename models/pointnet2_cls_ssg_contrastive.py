@@ -40,7 +40,7 @@ class get_model(nn.Module):
         return h, z
 
 class ClassifierHead(nn.Module):
-    def __init__(self, args, input_dim=2048, num_classes=40):
+    def __init__(self, args, input_dim=1024, num_classes=40):
         nn.Module.__init__(self)
 
         projection_hidden = int(input_dim / 2)
