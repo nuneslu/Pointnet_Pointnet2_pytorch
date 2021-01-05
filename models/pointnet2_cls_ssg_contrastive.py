@@ -13,16 +13,16 @@ class get_model(nn.Module):
         self.sa2 = PointNetSetAbstraction(npoint=128, radius=0.4, nsample=64, in_channel=128 + 3, mlp=[128, 128, 256], group_all=False)
         self.sa3 = PointNetSetAbstraction(npoint=None, radius=None, nsample=None, in_channel=256 + 3, mlp=[256, 512, 1024], group_all=True)
         
-        self.projection_head = torch.nn.Sequential(
-            torch.nn.Linear(1024, 512),
-            torch.nn.BatchNorm1d(512),
-            torch.nn.ReLU(),
-            torch.nn.Dropout(0.4),
-            torch.nn.Linear(512, 256),
-            torch.nn.BatchNorm1d(256),
-            torch.nn.ReLU(),
-            torch.nn.Dropout(0.4),
-            torch.nn.Linear(feature_size)
+        self.projection_head = nn.Sequential(
+            nn.Linear(1024, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+            nn.Linear(feature_size)
         )
 
     def forward(self, xyz):
