@@ -5,20 +5,25 @@ sys.path.append('./models')
 from pointnet_util import PointNetSetAbstraction
 
 class get_model(nn.Module):
-    def __init__(self,num_class,normal_channel=True):
+    def __init__(self,feature_size=128,normal_channel=True):
         super(get_model, self).__init__()
         in_channel = 6 if normal_channel else 3
         self.normal_channel = normal_channel
         self.sa1 = PointNetSetAbstraction(npoint=512, radius=0.2, nsample=32, in_channel=in_channel, mlp=[64, 64, 128], group_all=False)
         self.sa2 = PointNetSetAbstraction(npoint=128, radius=0.4, nsample=64, in_channel=128 + 3, mlp=[128, 128, 256], group_all=False)
         self.sa3 = PointNetSetAbstraction(npoint=None, radius=None, nsample=None, in_channel=256 + 3, mlp=[256, 512, 1024], group_all=True)
-        self.fc1 = nn.Linear(1024, 512)
-        self.bn1 = nn.BatchNorm1d(512)
-        self.drop1 = nn.Dropout(0.4)
-        self.fc2 = nn.Linear(512, 256)
-        self.bn2 = nn.BatchNorm1d(256)
-        self.drop2 = nn.Dropout(0.4)
-        self.fc3 = nn.Linear(256, num_class)
+        
+        self.projection_head = torch.nn.Sequential(
+            torch.nn.Linear(1024, 512),
+            torch.nn.BatchNorm1d(512),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(0.4),
+            torch.nn.Linear(512, 256),
+            torch.nn.BatchNorm1d(256),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(0.4),
+            torch.nn.Linear(feature_size)
+        )
 
     def forward(self, xyz):
         B, _, _ = xyz.shape
@@ -32,24 +37,17 @@ class get_model(nn.Module):
         l2_xyz, l2_points = self.sa2(l1_xyz, l1_points)
         l3_xyz, l3_points = self.sa3(l2_xyz, l2_points)
         h = l3_points.view(B, 1024)
-        x = self.drop1(F.relu(self.bn1(self.fc1(h))))
-        x = self.drop2(F.relu(self.bn2(self.fc2(x))))
-        x = self.fc3(x)
-        z = F.log_softmax(x, -1)
+        z = self.projection_head(h)
 
         return h, z
 
-class ClassifierHead(nn.Module):
+class ClassifierHead(torch.nn.Module):
     def __init__(self, args, input_dim=1024, num_classes=40):
-        nn.Module.__init__(self)
+        torch.nn.Module.__init__(self)
 
-        projection_hidden = int(input_dim / 2)
-        self.classifier_head = nn.Sequential(
-            nn.Linear(input_dim, projection_hidden),
-            nn.BatchNorm1d(projection_hidden),
-            nn.ReLU(),
-            nn.Linear(projection_hidden, num_classes),
-        )
+        self.fc = torch.nn.Linear(input_dim, num_classes)
+        self.fc = self.fc.cuda() if args.use_cuda else self.fc
 
     def forward(self, x):
-        return self.classifier_head(x)
+        x = self.fc(x)
+        return x
