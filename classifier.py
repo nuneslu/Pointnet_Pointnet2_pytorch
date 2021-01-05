@@ -20,7 +20,7 @@ def train_validate(simclr, classifier, optimizer, data, args, is_train):
     else:
         classifier.eval()
 
-    loss_func = torch.nn.NLLLoss()
+    loss_func = torch.nn.CrossEntropyLoss()
     initial_loss = None
     total_loss = 0.0
     total_acc = 0.0
