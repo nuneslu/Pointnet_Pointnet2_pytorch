@@ -57,9 +57,7 @@ def train_validate(simclr, classifier, optimizer, data, args, is_train):
             total_loss += loss.item()
 
             # accumulate accuracy
-            print(z)
             pred = z.max(dim=1)[1]
-            print(pred)
             correct = pred.eq(y).sum().item()
             correct /= y.size(0)
             batch_acc = (correct * 100)
