@@ -1,12 +1,10 @@
-import numpy as np
 import torch
-import torchvision
-import torchvision.datasets as datasets
-#from data_loader import *
 from PIL import Image
-from losses.contrastive import ContrastiveLoss
-from data_utils.ModelNetContrastiveDataLoader import ModelNetContrastiveDataLoader
+import torchvision
+import os
 from math import ceil, floor
+from losses.contrastive import ContrastiveLoss
+from data_utils.ModelNetDataLoader import ModelNetDataLoader
 import argparse
 from models import pointnet2_cls_ssg_contrastive
 from numpy import inf
@@ -14,117 +12,90 @@ from numpy import inf
 INFINITE = inf
 DATA_PATH = './data/modelnet40_normal_resampled'
 
-def save_checkpoint(v_loss, epoch, model, optimizer, args):
-    # save the best loss checkpoint
-    print('\nWriting model checkpoint')
-    state = {
-        'epoch': epoch,
-        'model': model.state_dict(),
-        'optimizer': optimizer.state_dict(),
-        'val_loss': v_loss
-    }
-    file_name = f'{args.log_dir}/{args.checkpoint}'
-
-    torch.save(state, file_name)
-
-def compute_grad(model):
-    param_count = 0
-    grad_ = 0.0
-    for f in model.parameters():
-        param_count += 1
-        if f.grad is None:
-            continue
-        grad_ += torch.sum(torch.abs(f.grad))
-
-    grad_ /= param_count
-
-    return grad_
-
-
-def train_validate(simclr, loss_func, optimizer, data, args, is_train):
+def train_validate(simclr, classifier, optimizer, data, args, is_train):
     # if is_train set the model to be trainable and
     # else to only eval data
     if is_train:
-        simclr.train()
-        simclr.zero_grad()
+        classifier.train()
     else:
-        simclr.eval()
+        classifier.eval()
 
+    loss_func = torch.nn.CrossEntropyLoss()
+    initial_loss = None
     total_loss = 0.0
-    grad_ = 0.0
+    total_acc = 0.0
 
     data_iterator = iter(data)
 
     # keep iterating over data loader until StopIteration exception
-    i = 0
     while True:
         try:
-            xi, xj, _ = data_iterator.next()
+            # zero gradients
+            classifier.zero_grad()
+            x, y = data_iterator.next()
 
-            xi = xi.cuda() if args.use_cuda else xi
-            xj = xj.cuda() if args.use_cuda else xj
+            x = x.cuda() if args.use_cuda else x
+            y = y.cuda() if args.use_cuda else y
 
-            xi = xi.transpose(2, 1)
-            xj = xj.transpose(2, 1)
-            # get z(h(x))
-            _, zi = simclr(xi)
-            _, zj = simclr(xj)
+            x = x.transpose(2, 1)
+            # get h(x)
+            h, _ = simclr(x)
+            # get classification
+            z = classifier(h)
 
             # compute contrastive loss
-            loss = loss_func(zi, zj)
+            loss = loss_func(z, y)
 
             # if is_train backpropagate
             if is_train:
                 loss.backward()
-
-            if (i + 1) % args.accumulation_steps == 0 and is_train:
                 optimizer.step()
-                grad_ = compute_grad(simclr)
-                simclr.zero_grad()
 
             # accumulate losses
             total_loss += loss.item()
-            i += 1
 
-            print(f'\t- Loss: {loss.item()}\tGrad: {grad_}', end='\r')
+            # accumulate accuracy
+            pred = z.max(dim=1)[1]
+            correct = pred.eq(y).sum().item()
+            correct /= y.size(0)
+            batch_acc = (correct * 100)
+            total_acc += batch_acc
+
+            print(f'\t- Loss: {loss.item()}\tAcc: {batch_acc}', end='\r')
         except StopIteration as si:
             break
 
     # return the epoch mean loss
-    return total_loss / len(data)
+    return total_loss / len(data), total_acc / len(data)
 
 
-def run_trainer_evaluator(simclr, loss_func, optimizer, args):
-    data_train = ModelNetContrastiveDataLoader(root=DATA_PATH, npoint=1024, split='train',
+def run_trainer_evaluator(simclr, classifier, optimizer, args):
+    data_train = ModelNetDataLoader(root=DATA_PATH, npoint=1024, split='train',
                                                      normal_channel=False)
-    data_test = ModelNetContrastiveDataLoader(root=DATA_PATH, npoint=1024, split='test',
+    data_test = ModelNetDataLoader(root=DATA_PATH, npoint=1024, split='test',
                                                     normal_channel=False)
     best_vloss = INFINITE
 
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(cifar_train), eta_min=0, last_epoch=-1)
-
     for epoch in range(args.epochs):
         print(f'Starting epoch [{epoch}/{args.epochs}]')
-
         # create the data loader for train and validation data
         train_loader = torch.utils.data.DataLoader(data_train, batch_size=args.batch_size, shuffle=True)
-        test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=True)
+        test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False)
 
         # train and retrieve training loss
-        t_loss = train_validate(simclr, loss_func, optimizer, train_loader, args, is_train=True)
+        t_loss, t_acc = train_validate(simclr, classifier, optimizer, train_loader, args, is_train=True)
 
         # retrieve validation loss
-        v_loss = train_validate(simclr, loss_func, optimizer, test_loader, args, is_train=False)
+        v_loss, v_acc = train_validate(simclr, classifier, optimizer, test_loader, args, is_train=False)
 
-        # adjust learning rate
-        # scheduler.step()
-
-        print(f'\nTotal epoch losses:\ttrain: {t_loss}\tvalidation: {v_loss}\n', end='\r')
+        print(f'\nTotal epoch losses: train: {round(t_loss,4)} - validation: {round(v_loss,4)}')
+        print(f'\nTotal epoch acc: train: {round(t_acc,4)} - validation: {round(v_acc,4)}\n', end='\r')
 
         # if the current loss is the new best, update checkpoint
         if v_loss < best_vloss:
             best_vloss = v_loss
-            save_checkpoint(v_loss, epoch, simclr, optimizer, args)
+            # save_checkpoint(v_loss, epoch, simclr, optimizer, scheduler)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SIMCLR')
@@ -135,16 +106,12 @@ if __name__ == "__main__":
                         help='Path to dataset (default: data')
     parser.add_argument('--batch-size', type=int, default=16, metavar='N',
                         help='input training batch-size')
-    parser.add_argument('--epochs', type=int, default=200, metavar='N',
-                        help='number of training epochs (default: 150)')
+    parser.add_argument('--epochs', type=int, default=100, metavar='N',
+                        help='number of training epochs (default: 100)')
     parser.add_argument('--lr', type=float, default=1e-3,
                         help='learning rate (default: 1e-3')
     parser.add_argument("--decay-lr", default=1e-6, action="store", type=float,
                         help='Learning rate decay (default: 1e-6')
-    parser.add_argument('--accumulation-steps', type=int, default=4, metavar='N',
-                        help='Gradient accumulation steps (default: 4')
-    parser.add_argument('--tau', default=0.5, type=float,
-                        help='Tau temperature smoothing (default 0.5)')
     parser.add_argument('--log-dir', type=str, default='checkpoint',
                         help='logging directory (default: checkpoint)')
     parser.add_argument('--checkpoint', type=str, default='bestcheckpoint.pt',
@@ -171,9 +138,20 @@ if __name__ == "__main__":
         dtype = torch.FloatTensor
         device = torch.device("cpu")
 
-    simclr = pointnet2_cls_ssg_contrastive.get_model(num_class=40, normal_channel=False).type(dtype)
-    loss_func = ContrastiveLoss(args.tau)
-    
-    optimizer = torch.optim.Adam(simclr.parameters(), lr=args.lr, weight_decay=args.decay_lr)
+    simclr = pointnet2_cls_ssg_contrastive.get_model()#SimCLR(args).type(dtype)
+    # do not train it anymore
+    simclr.eval()
 
-    run_trainer_evaluator(simclr, loss_func, optimizer, args)
+    if os.path.isfile(f'{args.log_dir}/{args.checkpoint}'):
+       checkpoint = torch.load(f'{args.log_dir}/{args.checkpoint}')
+       simclr.load_state_dict(checkpoint['model'])
+       epoch = checkpoint['epoch']
+       print(f'Loading model: {args.checkpoint}, from epoch: {epoch}')
+    else:
+       print('Trained model not found!')
+
+    classifier = pointnet2_cls_ssg_contrastive.ClassifierHead(args).type(dtype)
+
+    optimizer = torch.optim.Adam(classifier.parameters(), lr=args.lr, weight_decay=args.decay_lr)
+
+    run_trainer_evaluator(simclr, classifier, optimizer, args)

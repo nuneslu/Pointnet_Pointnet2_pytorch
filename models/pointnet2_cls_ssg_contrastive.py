@@ -4,7 +4,6 @@ import sys
 sys.path.append('./models')
 from pointnet_util import PointNetSetAbstraction
 
-
 class get_model(nn.Module):
     def __init__(self,num_class,normal_channel=True):
         super(get_model, self).__init__()
@@ -40,13 +39,17 @@ class get_model(nn.Module):
 
         return h, z
 
+class ClassifierHead(torch.nn.Module):
+    def __init__(self, args, input_dim=2048, num_classes=40):
+        torch.nn.Module.__init__(self)
 
+        projection_hidden = int(input_dim / 2)
+        self.classifier_head = torch.nn.Sequential(
+            torch.nn.Linear(input_dim, projection_hidden),
+            torch.nn.BatchNorm1d(projection_hidden),
+            torch.nn.ReLU(),
+            torch.nn.Linear(projection_hidden, num_classes),
+        )
 
-class get_loss(nn.Module):
-    def __init__(self):
-        super(get_loss, self).__init__()
-
-    def forward(self, pred, target, trans_feat):
-        total_loss = F.nll_loss(pred, target)
-
-        return total_loss
+    def forward(self, x):
+        return self.classifier_head(x)
