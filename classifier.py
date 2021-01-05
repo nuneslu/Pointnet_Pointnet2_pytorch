@@ -43,6 +43,7 @@ def train_validate(simclr, classifier, optimizer, data, args, is_train):
             # get classification
             z = classifier(h)
 
+            print(y)
             # compute contrastive loss
             loss = loss_func(z, y)
 
