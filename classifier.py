@@ -140,7 +140,7 @@ if __name__ == "__main__":
         dtype = torch.FloatTensor
         device = torch.device("cpu")
 
-    simclr = pointnet2_cls_ssg_contrastive.get_model(num_class=40, normal_channel=False).type(dtype)
+    simclr = pointnet2_cls_ssg_contrastive.get_model(feature_size=args.feature_size, normal_channel=False).type(dtype)
     # do not train it anymore
     simclr.eval()
 
