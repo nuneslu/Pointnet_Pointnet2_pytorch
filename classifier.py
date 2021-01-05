@@ -37,13 +37,14 @@ def train_validate(simclr, classifier, optimizer, data, args, is_train):
             x = x.cuda() if args.use_cuda else x
             y = y.cuda() if args.use_cuda else y
 
+            y = y[:, 0]
+
             x = x.transpose(2, 1)
             # get h(x)
             h, _ = simclr(x)
             # get classification
             z = classifier(h)
 
-            print(y)
             # compute contrastive loss
             loss = loss_func(z, y)
 
